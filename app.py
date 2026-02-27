@@ -5,10 +5,25 @@ import plotly.graph_objects as go
 import pandas_ta as ta
 from streamlit_autorefresh import st_autorefresh
 import time
+import requests
 
-# 1. إعدادات الصفحة والتحديث الفائق
-st.set_page_config(page_title="NEXUS GOLD TERMINAL PRO", layout="wide")
-st_autorefresh(interval=10000, key="nexus_final_v5") # تحديث كل 10 ثواني
+# ==========================================
+# إعدادات التنبيهات (حط بياناتك هنا)
+# ==========================================
+TELEGRAM_TOKEN = "اكتب_هنا_الـ_TOKEN_بتاعك"
+CHAT_ID = "اكتب_هنا_رقم_الـ_ID_بتاعك"
+
+def send_telegram_msg(message):
+    if "اكتب_هنا" in TELEGRAM_TOKEN: return # تخطي لو البيانات لسه ما دخلتش
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={CHAT_ID}&text={message}"
+    try:
+        requests.get(url, timeout=5)
+    except:
+        pass
+
+# 1. إعدادات الصفحة والتحديث الفائق (كل 10 ثواني)
+st.set_page_config(page_title="NEXUS GOLD TERMINAL PRO V6", layout="wide")
+st_autorefresh(interval=10000, key="nexus_final_v6")
 
 # 2. تصميم الواجهة النيون المتقدمة
 st.markdown("""
@@ -26,7 +41,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. إدارة الوقت والأمان
+# 3. إدارة الجلسة والأمان
 if "last_update" not in st.session_state: st.session_state.last_update = time.time()
 if "auth" not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
@@ -36,7 +51,7 @@ if not st.session_state.auth:
             st.rerun()
     st.stop()
 
-# 4. شريط التحكم
+# 4. شريط التحكم الجانبي
 with st.sidebar:
     st.markdown("### 🛠️ إعدادات الصاغة")
     local_21 = st.number_input("سعر عيار 21 (مصر):", value=7020)
@@ -45,8 +60,9 @@ with st.sidebar:
     if st.button("🔄 تحديث إجباري"):
         st.session_state.last_update = time.time()
         st.rerun()
+    st.info("💡 التنبيهات تعمل تلقائياً عند وصول RSI لـ 70 أو 35.")
 
-# 5. محرك البيانات والذكاء الاصطناعي
+# 5. محرك البيانات
 @st.cache_data(ttl=10)
 def get_market_data():
     df = yf.download("GC=F", period="1mo", interval="1h")
@@ -61,19 +77,24 @@ try:
     prev_global = float(df['Close'].iloc[-2])
     rsi_val = float(df['RSI'].iloc[-1])
     
-    # تحديد السهم (بيسخن ولا بيبرد)
-    if curr_global > prev_global:
-        trend_arrow = "<span class='trend-up'>▲ (السعر بيسخن الآن)</span>"
-    else:
-        trend_arrow = "<span class='trend-down'>▼ (السعر بيبرد الآن)</span>"
+    # تحديد اتجاه السهم
+    trend_arrow = "<span class='trend-up'>▲ (السعر يسخن)</span>" if curr_global > prev_global else "<span class='trend-down'>▼ (السعر يبرد)</span>"
     
-    # تحديد لون الـ RSI (المنبه الذكي)
+    # منطق الـ RSI والتنبيهات
     if rsi_val > 70:
-        rsi_html = f"<span class='rsi-hot'>⚠️ {int(rsi_val)} (خطر - تشبع بيعي)</span>"
+        rsi_html = f"<span class='rsi-hot'>⚠️ {int(rsi_val)} (خطر - بيع)</span>"
+        if "alert_high" not in st.session_state:
+            send_telegram_msg(f"🚨 NEXUS ALERT: الذهب في منطقة خطر! RSI: {int(rsi_val)}. السعر: ${curr_global}")
+            st.session_state.alert_high = True
     elif rsi_val < 35:
-        rsi_html = f"<span class='rsi-cool'>✅ {int(rsi_val)} (لقطة - منطقة شراء)</span>"
+        rsi_html = f"<span class='rsi-cool'>✅ {int(rsi_val)} (لقطة - شراء)</span>"
+        if "alert_low" not in st.session_state:
+            send_telegram_msg(f"💰 NEXUS ALERT: فرصة شراء لقطة! RSI: {int(rsi_val)}. السعر المحلي: {local_21}")
+            st.session_state.alert_low = True
     else:
         rsi_html = f"<span style='color: #00E5FF;'>{int(rsi_val)} (منطقة آمنة)</span>"
+        st.session_state.pop("alert_high", None)
+        st.session_state.pop("alert_low", None)
 
     # الحسابات
     seconds_ago = int(time.time() - st.session_state.last_update)
@@ -93,22 +114,22 @@ try:
 
     st.markdown("---")
 
-    # 6. المربعات التحليلية (Oracle)
+    # 6. المربعات التحليلية
     col_a, col_b = st.columns(2)
     
     with col_a:
         if gap_pct < -1:
-            short_msg = f"<div style='color:#39FF14; font-size:20px;'>✅ القرار: اشتري فوراً</div><p>السعر المحلي أرخص من العالمي بـ {abs(gap_pct):.1f}%.<br>مكسبك المتوقع في الجرام: <b>{fair_local_price - local_21:.0f} جنيه</b>.</p>"
+            short_msg = f"<div style='color:#39FF14; font-size:20px;'>✅ القرار: اشتري فوراً</div><p>السعر المحلي أرخص بـ {abs(gap_pct):.1f}%.<br>مكسبك المتوقع: <b>{fair_local_price - local_21:.0f} جنيه/جرام</b>.</p>"
         elif gap_pct > 10:
-            short_msg = "<div style='color:#FF007F; font-size:20px;'>❌ القرار: بيع/انتظر</div><p>فيه فقاعة في مصر حالياً. السعر غالي مقارنة بالبورصة العالمية.</p>"
+            short_msg = "<div style='color:#FF007F; font-size:20px;'>❌ القرار: بيع/انتظر</div><p>فقاعة سعرية في مصر. العالمي أرخص بكتير.</p>"
         else:
-            short_msg = "<div style='color:#FFD700; font-size:20px;'>🔄 القرار: تفرج (HOLD)</div><p>السوق متزن جداً حالياً، مفيش فرص ربح سريعة.</p>"
+            short_msg = "<div style='color:#FFD700; font-size:20px;'>🔄 القرار: تفرج (HOLD)</div><p>السوق متزن جداً حالياً.</p>"
         st.markdown(f"<div class='oracle-box'><h3>📅 المدى القريب</h3>{short_msg}</div>", unsafe_allow_html=True)
 
     with col_b:
         trend_long = "صاعد 📈" if curr_global > df['EMA_20'].iloc[-1] else "هابط 📉"
         long_msg = f"<div style='color:#00E5FF; font-size:20px;'>الاتجاه العام: {trend_long}</div>"
-        long_msg += f"<p>مؤشر القوة: {rsi_html}<br>لو الـ RSI كسر الـ 70، ابدأ جني أرباحك فوراً ولا تشتري جديد.</p>"
+        long_msg += f"<p>مؤشر القوة: {rsi_html}<br>لو الـ RSI كسر الـ 70، جني أرباحك فوراً.</p>"
         st.markdown(f"<div class='oracle-box'><h3>⏳ المدى البعيد</h3>{long_msg}</div>", unsafe_allow_html=True)
 
     # 7. الشارت
@@ -118,4 +139,4 @@ try:
     st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.info("Nexus is calibrating sensors...")
+    st.info("Nexus is calibrating...")
