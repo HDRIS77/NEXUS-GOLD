@@ -7,19 +7,28 @@ from streamlit_autorefresh import st_autorefresh
 
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="NEXUS GOLD TERMINAL PRO", layout="wide")
-st_autorefresh(interval=30000, key="nexus_v3_refresh")
+st_autorefresh(interval=30000, key="nexus_v4_refresh")
 
-# 2. تصميم الواجهة النيون
+# 2. تصميم الواجهة النيون (المربعات المحدثة)
 st.markdown("""
     <style>
     .main { background-color: #050505; }
     div[data-testid="stMetricValue"] { color: #00E5FF; text-shadow: 0 0 10px #00E5FF; }
-    h1, h2, h3 { color: #00E5FF !important; text-shadow: 0 0 15px #00E5FF; }
+    h1, h2, h3 { color: #00E5FF !important; text-shadow: 0 0 15px #00E5FF; text-align: center; }
     .stMetric { background-color: #0a0a0a; border: 1px solid #00E5FF; border-radius: 15px; }
-    .oracle-box { border: 2px solid #00E5FF; background: rgba(0, 229, 255, 0.05); padding: 25px; border-radius: 15px; min-height: 250px; line-height: 1.6; }
-    .buy-signal { color: #39FF14; font-weight: bold; border-left: 5px solid #39FF14; padding-left: 10px; }
-    .sell-signal { color: #FF007F; font-weight: bold; border-left: 5px solid #FF007F; padding-left: 10px; }
-    .hold-signal { color: #FFD700; font-weight: bold; border-left: 5px solid #FFD700; padding-left: 10px; }
+    .oracle-box { 
+        border: 2px solid #00E5FF; 
+        background: rgba(0, 229, 255, 0.05); 
+        padding: 20px; 
+        border-radius: 15px; 
+        min-height: 280px; 
+        color: white;
+        margin-bottom: 10px;
+    }
+    .buy-signal { color: #39FF14; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .sell-signal { color: #FF007F; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .hold-signal { color: #FFD700; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    p { font-size: 16px; line-height: 1.4; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -37,9 +46,9 @@ with st.sidebar:
     st.markdown("### 🛠️ إعدادات الصاغة")
     local_21 = st.number_input("سعر عيار 21 (مصر):", value=7020)
     bank_usd = st.number_input("سعر دولار البنك:", value=48.5)
-    st.info("💡 نصيحة: لو البرنامج وقف، اتأكد إن السعر العالمي مش مهنج.")
+    st.info("💡 التحديث تلقائي كل 30 ثانية.")
 
-# 5. جلب الداتا
+# 5. جلب الداتا العالمية
 @st.cache_data(ttl=30)
 def get_intel():
     df = yf.download("GC=F", period="1mo", interval="1h")
@@ -69,45 +78,29 @@ try:
 
     st.markdown("---")
 
-    # 6. المربعات التحليلية (NEXUS ORACLE)
+    # 6. المربعات التحليلية (NEXUS ORACLE) - تم حقن النصوص بالداخل
     col_a, col_b = st.columns(2)
     
+    # تحضير رسالة المدى القريب
+    if gap_pct < -1:
+        short_html = f"<div class='buy-signal'>✅ القرار: اشتري فوراً</div><p><b>السبب:</b> الذهب في مصر لقطة، أرخص من العالمي بـ {abs(gap_pct):.1f}%.<br><b>التوقع:</b> السعر في مصر لازم يشد لـ <b>{fair_local_price:.0f} ج.م</b>.<br><b>نسبة النجاح:</b> 90%</p>"
+    elif gap_pct > 12:
+        short_html = f"<div class='sell-signal'>❌ القرار: بيع أو انتظر</div><p><b>السبب:</b> فيه فقاعة وسعر عالي وهمي في مصر حالياً.<br><b>التوقع:</b> السعر ممكن يريح لـ <b>{fair_local_price:.0f} ج.م</b>.<br><b>نسبة النجاح:</b> 75%</p>"
+    else:
+        short_html = "<div class='hold-signal'>🔄 القرار: تفرج (HOLD)</div><p>السعر المحلي والعالمي ماشيين مع بعض بالمليم. مفيش فرصة لربح سريع، استنى فجوة سعرية تظهر.</p>"
+
+    # تحضير رسالة المدى البعيد
+    if curr_global > df['EMA_20'].iloc[-1]:
+        long_html = f"<div class='buy-signal'>📈 الاتجاه: صعود مستمر</div><p>الذهب عالمياً قوي ومجمع للشراء.<br><b>الهدف:</b> قد نرى مستويات <b>${curr_global * 1.05:.0f}</b> قريباً.</p>"
+    else:
+        long_html = f"<div class='sell-signal'>📉 الاتجاه: تصحيح هابط</div><p>الذهب بيفقد قوته حالياً، احتمال ينزل لمستويات <b>${curr_global * 0.95:.0f}</b> قبل ما يرتد.</p>"
+    long_html += f"<p><b>مؤشر RSI:</b> {int(rsi_val)} (فوق 70 خطر | تحت 30 لقطة)</p>"
+
     with col_a:
-        st.markdown("<div class='oracle-box'>", unsafe_allow_html=True)
-        st.subheader("📅 المدى القريب (قرارات اليوم)")
-        
-        if gap_pct < -1:
-            st.markdown("<div class='buy-signal'>✅ القرار: اشتري فوراً</div>", unsafe_allow_html=True)
-            st.write(f"**السبب:** الذهب في مصر أرخص من العالمي بـ {abs(gap_pct):.1f}%.")
-            st.write(f"**التوقع:** السعر في مصر لازم يطلع لـ **{fair_local_price:.0f} ج.م** عشان يلحق العالمي.")
-            st.write(f"**نسبة النجاح:** 90% (لو السعر العالمي ثبت).")
-        elif gap_pct > 12:
-            st.markdown("<div class='sell-signal'>❌ القرار: بيع أو انتظر</div>", unsafe_allow_html=True)
-            st.write(f"**السبب:** الذهب في مصر أغلى من قيمته الحقيقية (فقاعة).")
-            st.write(f"**التوقع:** السعر ممكن ينزل لـ **{fair_local_price:.0f} ج.م** لو السوق هدي.")
-            st.write(f"**نسبة النجاح:** 75%.")
-        else:
-            st.markdown("<div class='hold-signal'>🔄 القرار: تفرج فقط</div>", unsafe_allow_html=True)
-            st.write("**السبب:** السعر المحلي ماشي مع العالمي بالمليم، مفيش فرصة ربح سريعة.")
-            st.write("**نصيحة:** لا تدخل الآن، انتظر حدوث فجوة سعرية.")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='oracle-box'><h3>📅 المدى القريب</h3>{short_html}</div>", unsafe_allow_html=True)
 
     with col_b:
-        st.markdown("<div class='oracle-box'>", unsafe_allow_html=True)
-        st.subheader("⏳ المدى البعيد (نظرة استراتيجية)")
-        
-        if curr_global > df['EMA_20'].iloc[-1]:
-            st.markdown("<div class='buy-signal'>📈 الاتجاه: صعود مستمر</div>", unsafe_allow_html=True)
-            target = curr_global * 1.05
-            st.write(f"**التحليل:** الذهب عالمياً فوق متوسط الـ 20 ساعة، ده معناه 'تجميع' للشراء.")
-            st.write(f"**الهدف القادم:** قد يلامس العالمي مستويات **${target:.0f}**.")
-        else:
-            st.markdown("<div class='sell-signal'>📉 الاتجاه: تصحيح هابط</div>", unsafe_allow_html=True)
-            target = curr_global * 0.95
-            st.write(f"**التحليل:** الذهب بيفقد قوته عالمياً، احتمال ينزل لمستويات **${target:.0f}** قبل ما يرتد.")
-            
-        st.write(f"**مؤشر RSI:** {int(rsi_val)} (لو فوق 70 يبقى خطر، لو تحت 30 يبقى لقطة).")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='oracle-box'><h3>⏳ المدى البعيد</h3>{long_html}</div>", unsafe_allow_html=True)
 
     # 7. الشارت
     fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
