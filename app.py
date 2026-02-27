@@ -5,113 +5,75 @@ import plotly.graph_objects as go
 import pandas_ta as ta
 from streamlit_autorefresh import st_autorefresh
 
-# 1. إعدادات الصفحة الأساسية
+# 1. الإعدادات
 st.set_page_config(page_title="NEXUS GOLD TERMINAL", layout="wide")
-st_autorefresh(interval=60000, key="nexus_refresh") # تحديث كل دقيقة لضمان الاستقرار
+st_autorefresh(interval=30000, key="nexus_final_fix")
 
-# 2. تصميم الواجهة نيون (ثابت ومستقر)
+# 2. الاستايل
 st.markdown("""
     <style>
     .main { background-color: #050505; }
     div[data-testid="stMetricValue"] { color: #00E5FF; text-shadow: 0 0 10px #00E5FF; }
-    h1, h2, h3 { color: #00E5FF !important; text-shadow: 0 0 15px #00E5FF; text-align: center; }
-    .stMetric { background-color: #0a0a0a; border: 1px solid #00E5FF; border-radius: 15px; padding: 15px; }
-    .oracle-box { border: 2px solid #00E5FF; background: rgba(0, 229, 255, 0.05); padding: 20px; border-radius: 15px; min-height: 150px; margin-top: 10px;}
-    .status-box { background-color: #1a1a1a; padding: 10px; border-radius: 10px; border-left: 5px solid #00E5FF; }
+    .stMetric { background-color: #0a0a0a; border: 1px solid #00E5FF; border-radius: 15px; }
+    .opportunity-box { border: 2px solid #39FF14; background: rgba(57, 255, 20, 0.1); padding: 20px; border-radius: 15px; color: #39FF14; font-weight: bold; text-align: center; }
+    .bubble-box { border: 2px solid #FF007F; background: rgba(255, 0, 127, 0.1); padding: 20px; border-radius: 15px; color: #FF007F; font-weight: bold; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. نظام الأمان
+# 3. الأمان
 if "auth" not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
-    st.markdown("<h1>🔐 NEXUS GATE</h1>", unsafe_allow_html=True)
-    with st.form("login"):
-        pwd = st.text_input("ACCESS KEY:", type="password")
-        if st.form_submit_button("UNLOCK"):
-            if pwd == "neuxs_gold_2024":
-                st.session_state.auth = True
-                st.rerun()
-            else: st.error("INVALID KEY")
+    with st.form("gate"):
+        if st.text_input("KEY:", type="password") == "neuxs_gold_2024":
+            st.session_state.auth = True
+            st.rerun()
     st.stop()
 
-# 4. شريط التحكم الجانبي (Side Panel)
+# 4. المدخلات
 with st.sidebar:
-    st.markdown("### ⚙️ إعدادات الصاغة")
-    local_21_price = st.number_input("سعر جرام 21 الآن (مصر):", value=3600, step=5)
-    official_usd = st.number_input("سعر دولار البنك:", value=48.50, step=0.1)
-    st.markdown("---")
-    st.write("💡 نصيحة محامي الشيطان: ادخل الأسعار الحقيقية لتكشف الفقاعة.")
+    local_21 = st.number_input("سعر 21 في مصر:", value=7020)
+    bank_usd = st.number_input("دولار البنك:", value=48.5)
 
-# 5. محرك جلب البيانات (تعديل الرمز لضمان الدقة)
-@st.cache_data(ttl=60)
-def get_clean_data():
-    # استخدام GC=F (عقود الذهب) مع التأكد من جلب السعر اللحظي
-    ticker = yf.Ticker("GC=F")
-    df = ticker.history(period="1mo", interval="1h")
-    # إذا فشل، نحاول الرمز البديل لضمان عدم توقف التطبيق
-    if df.empty:
-        df = yf.download("GC=F", period="1mo", interval="1h")
-    
+# 5. الداتا
+@st.cache_data(ttl=30)
+def get_gold():
+    df = yf.download("GC=F", period="1mo", interval="1h")
     if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-    
-    # حساب المؤشرات
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    df['EMA_20'] = ta.ema(df['Close'], length=20)
     return df
 
 try:
-    data = get_clean_data()
-    # جلب آخر سعر إغلاق صحيح (العالمي)
+    data = get_gold()
     global_spot = float(data['Close'].iloc[-1])
-    rsi_val = float(data['RSI'].iloc[-1])
     
-    # --- الحسابات المنطقية (The Devil's Math) ---
-    # السعر العالمي للأونصة تحوله لسعر جرام 24 (قسمة 31.1)
-    # ثم تحوله لعيار 21 (ضرب 21/24)
-    # ثم تحسب الدولار التحوطي
-    hedging_usd = (local_21_price / (global_spot / 31.1 * (21/24)))
-    gap_pct = ((hedging_usd - official_usd) / official_usd) * 100
+    # الحسبة الدقيقة
+    fair_price_21_usd = (global_spot / 31.1035) * (21/24)
+    hedging_usd = local_21 / fair_price_21_usd
+    gap_pct = ((hedging_usd - bank_usd) / bank_usd) * 100
 
-    # 6. الواجهة الرئيسية
-    st.markdown("<h1>⚡ NEXUS INTELLIGENCE TERMINAL ⚡</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>⚡ NEXUS INTELLIGENCE ⚡</h1>", unsafe_allow_html=True)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.metric("GLOBAL SPOT", f"${global_spot:,.2f}")
     c2.metric("HEDGING USD", f"{hedging_usd:.2f} EGP")
-    c3.metric("ARB GAP (فقاعة)", f"{gap_pct:.1f}%")
-    c4.metric("CONFIDENCE", f"{int(50 + (abs(50-rsi_val)*0.5))}%")
+    c3.metric("ARB GAP", f"{gap_pct:.1f}%")
 
     st.markdown("---")
 
-    # 7. التوقعات (Oracle)
-    st.markdown("### 🔮 NEXUS ANALYTICS: تحليل المسارات")
-    col_a, col_b = st.columns(2)
-    
-    with col_a:
-        st.markdown("<div class='oracle-box'>", unsafe_allow_html=True)
-        st.subheader("📅 المدى القريب")
-        if gap_pct > 10:
-            st.error("📉 SELL / WAIT: فجوة سعرية عالية. السوق المحلي 'منفوخ' ومخاطرة الشراء مرتفعة.")
-        elif gap_pct < 2:
-            st.success("📈 BUY: السعر المحلي عادل جداً مقارنة بالعالمي.")
-        else:
-            st.warning("🔄 HOLD: السوق مستقر، لا تندفع في قراراتك.")
-        st.markdown("</div>", unsafe_allow_html=True)
+    # 6. تحليل محامي الشيطان
+    if gap_pct < 0:
+        st.markdown(f"""<div class='opportunity-box'>
+        🔥 فرصة شراء ذهبية! <br>
+        الذهب في مصر أرخص من السعر العالمي بـ {abs(gap_pct):.1f}%. <br>
+        السعر العادل المفروض يكون {fair_price_21_usd * bank_usd:.0f} ج.م.
+        </div>""", unsafe_allow_html=True)
+    elif gap_pct > 15:
+        st.markdown("<div class='bubble-box'>⚠️ تحذير: فقاعة سعرية! الذهب في مصر مسعر بدولار وهمي.</div>", unsafe_allow_html=True)
+    else:
+        st.info("🔄 السوق المحلي يتبع العالمي بشكل طبيعي حالياً.")
 
-    with col_b:
-        st.markdown("<div class='oracle-box'>", unsafe_allow_html=True)
-        st.subheader("⏳ المدى البعيد")
-        trend = "BULLISH (تجميع)" if global_spot > data['EMA_20'].iloc[-1] else "BEARISH (تصريف)"
-        st.write(f"الاتجاه الاستراتيجي: **{trend}**")
-        st.write(f"مؤشر القوة (RSI): **{int(rsi_val)}**")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # 8. الشارت
-    fig = go.Figure(data=[go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'],
-                    increasing_line_color='#00E5FF', decreasing_line_color='#FF007F')])
-    fig.update_layout(template="plotly_dark", height=450, margin=dict(l=0,r=0,b=0,t=0))
+    # الشارت
+    fig = go.Figure(data=[go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])])
+    fig.update_layout(template="plotly_dark", height=400)
     st.plotly_chart(fig, use_container_width=True)
 
-except Exception as e:
-    st.error(f"حدث خطأ في جلب البيانات: {e}")
-    st.info("حاول تحديث الصفحة أو التأكد من اتصال الإنترنت.")
+except Exception as e: st.write("Waiting for market signal...")
