@@ -6,3 +6,4 @@ streamlit-autorefresh
 pandas_ta        # للتحليل الفني المتقدم (RSI, EMA, etc.)
 numpy            # للعمليات الحسابية المعقدة والمحاكاة
 scipy            # لمحاكاة مونت كارلو والسيناريوهات
+pandas_ta
