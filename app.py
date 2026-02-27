@@ -10,8 +10,8 @@ import requests
 # ==========================================
 # 1. إعدادات التنبيهات (حط بياناتك هنا)
 # ==========================================
-TELEGRAM_TOKEN = "اكتب_هنا_الـ_TOKEN_بتاعك"
-CHAT_ID = "اكتب_هنا_رقم_الـ_ID_بتاعك"
+TELEGRAM_TOKEN = "8645106452:AAHoNE0zE9DytFE0rtfQQTWm0Gz3s06KA50"
+CHAT_ID = "1669823832"
 
 def send_telegram_msg(message):
     if "اكتب_هنا" in TELEGRAM_TOKEN: return 
