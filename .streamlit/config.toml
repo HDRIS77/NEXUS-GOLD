@@ -1,0 +1,6 @@
+[theme]
+primaryColor="#00E5FF"        # النيون الأزرق الرئيسي للخطوط واللوجو
+backgroundColor="#0A0A0A"      # أسود قاتم جداً للخلفية
+secondaryBackgroundColor="#1E1E1E" # رمادي غامق جداً للعناصر (Cards)
+textColor="#E0E0E0"           # أبيض مائل للرمادي لسهولة القراءة
+font="sans serif"
