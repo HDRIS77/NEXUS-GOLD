@@ -2,86 +2,82 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
+from streamlit_autorefresh import st_autorefresh # تطلب تثبيت المكتبة في requirements
 
-# --- إعدادات الأمان والصفحة ---
-st.set_page_config(page_title="NEUXS Gold Terminal", layout="wide")
+# --- إعدادات الواجهة النيون ---
+st.set_page_config(page_title="NEUXS GOLD TERMINAL", layout="wide")
 
-PASSWORD = "neuxs_gold_2024" 
+# تحديث الصفحة تلقائياً كل ثانيتين
+st_autorefresh(interval=2000, key="datarefresh")
 
-def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-    if not st.session_state.authenticated:
-        password_input = st.sidebar.text_input("ادخل كلمة السر للدخول:", type="password")
-        if password_input == PASSWORD:
-            st.session_state.authenticated = True
-            st.rerun() # تحديث الصفحة بعد إدخال الباسورد
-        else:
-            if password_input: st.error("كلمة السر خطأ")
-            st.warning("يرجى إدخال كلمة السر الصحيحة للوصول للنظام.")
-            return False
-    return True
+st.markdown("""
+    <style>
+    .main { background-color: #050505; }
+    .stMetric { background-color: #0f1111; border: 1px solid #00ff41; padding: 15px; border-radius: 10px; box-shadow: 0 0 10px #00ff41; }
+    h1, h2, h3 { color: #00ff41 !important; text-shadow: 0 0 10px #00ff41; font-family: 'Courier New', Courier, monospace; }
+    .stButton>button { background-color: #00ff41; color: black; border-radius: 20px; font-weight: bold; }
+    </style>
+    """, unsafe_allow_input_with_experimental_code=True)
 
-if check_password():
-    st.title("🏆 نظام تداول الذهب الذكي :NEUXS")
-    st.sidebar.header("لوحة التحكم")
+# --- نظام الأمان ---
+PASSWORD = "neuxs_gold_2024"
+if "auth" not in st.session_state: st.session_state.auth = False
 
-    @st.cache_data(ttl=300) 
-    def load_data():
-        gold = yf.download("GC=F", period="5d", interval="15m")
-        usd = yf.download("DX-Y.NYB", period="5d", interval="15m")
-        return gold, usd
+if not st.session_state.auth:
+    pwd = st.text_input("ENTER NEUXS ACCESS KEY:", type="password")
+    if pwd == PASSWORD: 
+        st.session_state.auth = True
+        st.rerun()
+    st.stop()
 
-    try:
-        gold_df, usd_df = load_data()
-        
-        if isinstance(gold_df.columns, pd.MultiIndex):
-            gold_df.columns = gold_df.columns.get_level_values(0)
-        if isinstance(usd_df.columns, pd.MultiIndex):
-            usd_df.columns = usd_df.columns.get_level_values(0)
-            
-        gold_df = gold_df.reset_index()
+# --- سحب البيانات ---
+def fetch_data():
+    gold = yf.download("GC=F", period="1d", interval="1m")
+    usd_egp = 70.0 # سعر دولار الصاغة (يمكنك تعديله يدوياً هنا)
+    return gold, usd_egp
 
-        # حساب المؤشرات
-        delta = gold_df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        gold_df['RSI'] = 100 - (100 / (1 + rs))
-        gold_df['EMA20'] = gold_df['Close'].ewm(span=20, adjust=False).mean()
+try:
+    gold_data, egp_rate = fetch_data()
+    current_global_price = float(gold_data['Close'].iloc[-1])
+    
+    # --- حسابات الذهب في مصر ---
+    # الأوقية = 31.1 جرام عيار 24
+    price_24_egp = (current_global_price / 31.1) * egp_rate
+    price_21_egp = price_24_egp * (21/24)
+    price_18_egp = price_24_egp * (18/24)
+    
+    # هامش محلات الذهب (تقريبي 2%)
+    spread = 0.02 
 
-        # استخراج القيم كأرقام بسيطة (التعديل هنا لحل المشكلة)
-        current_price = float(gold_df['Close'].iloc[-1])
-        last_rsi = float(gold_df['RSI'].iloc[-1])
-        current_usd = float(usd_df['Close'].iloc[-1])
-        prev_price = float(gold_df['Close'].iloc[-2])
-        change = current_price - prev_price
+    # --- Header ---
+    st.title("⚡ NEUXS GOLD INTELLIGENCE")
+    
+    # --- العرض العالمي والمحلي ---
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("GLOBAL GOLD (OZ)", f"${current_global_price:,.2f}")
+    c2.metric("عيار 24 (مصر)", f"{int(price_24_egp)} EGP")
+    c3.metric("عيار 21 (مصر)", f"{int(price_21_egp)} EGP")
+    c4.metric("عيار 18 (مصر)", f"{int(price_18_egp)} EGP")
 
-        # --- عرض المؤشرات العلوية ---
-        m1, m2, m3 = st.columns(3)
-        m1.metric("سعر أوقية الذهب", f"${current_price:,.2f}", f"{change:.2f}")
-        m2.metric("مؤشر القوة RSI", f"{last_rsi:.2f}")
-        m3.metric("اتجاه الدولار", f"{current_usd:.2f}")
+    st.markdown("---")
 
-        st.markdown("---")
+    # --- جدول البيع والشراء للتجار ---
+    st.subheader("🏦 تجارة الصاغة (تقديري):")
+    trade_col1, trade_col2 = st.columns(2)
+    
+    with trade_col1:
+        st.success(f"🟢 سعر الشراء (عيار 21): {int(price_21_egp)} EGP")
+    with trade_col2:
+        st.error(f"🔴 سعر البيع (عيار 21): {int(price_21_egp * (1-spread))} EGP")
 
-        # --- التوصية ---
-        st.subheader("📢 توصية نيكسس الحالية:")
-        if last_rsi > 70:
-            st.error("🔴 إشارة: بيع (SELL) - تشبع شراء")
-        elif last_rsi < 30:
-            st.success("🟢 إشارة: شراء (BUY) - تشبع بيع")
-        else:
-            st.warning("🟡 إشارة: انتظار (HOLD) - منطقة محايدة")
+    # --- الرسم البياني النيون ---
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=gold_data.index, y=gold_data['Close'], 
+                             line=dict(color='#00ff41', width=3),
+                             fill='toself', fillcolor='rgba(0, 255, 65, 0.1)', name="LIVE GOLD"))
+    fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', 
+                      plot_bgcolor='rgba(0,0,0,0)', xaxis_showgrid=False, yaxis_showgrid=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-        # --- الرسم البياني ---
-        fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=gold_df['Datetime' if 'Datetime' in gold_df.columns else 'Date'],
-                                     open=gold_df['Open'], high=gold_df['High'],
-                                     low=gold_df['Low'], close=gold_df['Close'], name="السعر"))
-        fig.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"حدث خطأ في عرض البيانات: {e}")
+except Exception as e:
+    st.write("CONNECTING TO NEUXS CORE...")
