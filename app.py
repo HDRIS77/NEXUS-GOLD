@@ -6,12 +6,11 @@ import pandas_ta as ta
 from streamlit_autorefresh import st_autorefresh
 import time
 
-# 1. إعدادات الصفحة
+# 1. إعدادات الصفحة والتحديث الفائق
 st.set_page_config(page_title="NEXUS GOLD TERMINAL PRO", layout="wide")
-# تحديث تلقائي كل 10 ثواني لضمان أقصى دقة
-st_autorefresh(interval=10000, key="nexus_ultra_refresh")
+st_autorefresh(interval=10000, key="nexus_final_v5") # تحديث كل 10 ثواني
 
-# 2. تصميم الواجهة النيون
+# 2. تصميم الواجهة النيون المتقدمة
 st.markdown("""
     <style>
     .main { background-color: #050505; }
@@ -19,29 +18,37 @@ st.markdown("""
     h1, h2, h3 { color: #00E5FF !important; text-shadow: 0 0 15px #00E5FF; text-align: center; }
     .stMetric { background-color: #0a0a0a; border: 1px solid #00E5FF; border-radius: 15px; }
     .oracle-box { border: 2px solid #00E5FF; background: rgba(0, 229, 255, 0.05); padding: 20px; border-radius: 15px; min-height: 280px; }
-    .timer-text { color: #FFD700; text-align: center; font-size: 14px; margin-bottom: 20px; font-family: monospace; }
-    .buy-signal { color: #39FF14; font-size: 24px; font-weight: bold; }
-    .sell-signal { color: #FF007F; font-size: 24px; font-weight: bold; }
+    .timer-text { color: #FFD700; text-align: center; font-size: 14px; margin-bottom: 10px; font-family: monospace; }
+    .trend-up { color: #39FF14; font-weight: bold; }
+    .trend-down { color: #FF007F; font-weight: bold; }
+    .rsi-hot { color: #FF007F; font-weight: bold; text-shadow: 0 0 5px #FF007F; }
+    .rsi-cool { color: #39FF14; font-weight: bold; text-shadow: 0 0 5px #39FF14; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. إدارة وقت التحديث
-if "last_update" not in st.session_state:
-    st.session_state.last_update = time.time()
+# 3. إدارة الوقت والأمان
+if "last_update" not in st.session_state: st.session_state.last_update = time.time()
+if "auth" not in st.session_state: st.session_state.auth = False
+if not st.session_state.auth:
+    with st.form("gate"):
+        if st.text_input("NEXUS KEY:", type="password") == "neuxs_gold_2024":
+            st.session_state.auth = True
+            st.rerun()
+    st.stop()
 
-# 4. التحكم في البيانات
+# 4. شريط التحكم
 with st.sidebar:
     st.markdown("### 🛠️ إعدادات الصاغة")
     local_21 = st.number_input("سعر عيار 21 (مصر):", value=7020)
     bank_usd = st.number_input("سعر دولار البنك:", value=48.5)
     st.markdown("---")
-    if st.button("تحديث يدوي الآن"):
+    if st.button("🔄 تحديث إجباري"):
         st.session_state.last_update = time.time()
         st.rerun()
 
-# 5. جلب الداتا العالمية
+# 5. محرك البيانات والذكاء الاصطناعي
 @st.cache_data(ttl=10)
-def get_intel():
+def get_market_data():
     df = yf.download("GC=F", period="1mo", interval="1h")
     if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
     df['RSI'] = ta.rsi(df['Close'], length=14)
@@ -49,23 +56,34 @@ def get_intel():
     return df
 
 try:
-    df = get_intel()
+    df = get_market_data()
     curr_global = float(df['Close'].iloc[-1])
+    prev_global = float(df['Close'].iloc[-2])
     rsi_val = float(df['RSI'].iloc[-1])
     
-    # حساب الثواني المنقضية
-    seconds_ago = int(time.time() - st.session_state.last_update)
+    # تحديد السهم (بيسخن ولا بيبرد)
+    if curr_global > prev_global:
+        trend_arrow = "<span class='trend-up'>▲ (السعر بيسخن الآن)</span>"
+    else:
+        trend_arrow = "<span class='trend-down'>▼ (السعر بيبرد الآن)</span>"
     
-    # الحسابات الاقتصادية
+    # تحديد لون الـ RSI (المنبه الذكي)
+    if rsi_val > 70:
+        rsi_html = f"<span class='rsi-hot'>⚠️ {int(rsi_val)} (خطر - تشبع بيعي)</span>"
+    elif rsi_val < 35:
+        rsi_html = f"<span class='rsi-cool'>✅ {int(rsi_val)} (لقطة - منطقة شراء)</span>"
+    else:
+        rsi_html = f"<span style='color: #00E5FF;'>{int(rsi_val)} (منطقة آمنة)</span>"
+
+    # الحسابات
+    seconds_ago = int(time.time() - st.session_state.last_update)
     fair_21_usd = (curr_global / 31.1035) * (21/24)
     hedging_usd = local_21 / fair_21_usd
     gap_pct = ((hedging_usd - bank_usd) / bank_usd) * 100
     fair_local_price = fair_21_usd * bank_usd
 
     st.markdown("<h1>⚡ NEXUS INTELLIGENCE TERMINAL ⚡</h1>", unsafe_allow_html=True)
-    
-    # عرض عداد الثواني
-    st.markdown(f"<div class='timer-text'>⏱️ آخر تحديث للسعر العالمي: منذ {seconds_ago} ثانية</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='timer-text'>⏱️ تحديث منذ {seconds_ago} ثانية | {trend_arrow}</div>", unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("GLOBAL SPOT", f"${curr_global:,.2f}")
@@ -75,23 +93,23 @@ try:
 
     st.markdown("---")
 
-    # 6. المربعات التحليلية
+    # 6. المربعات التحليلية (Oracle)
     col_a, col_b = st.columns(2)
     
-    if gap_pct < -1:
-        short_html = f"<div class='buy-signal'>✅ القرار: اشتري فوراً</div><p><b>التحليل:</b> الذهب في مصر أرخص من العالمي بـ {abs(gap_pct):.1f}%.<br><b>السعر العادل:</b> {fair_local_price:.0f} ج.م.<br><b>الفرصة:</b> ربح {fair_local_price - local_21:.0f} جنيه في كل جرام عند التصحيح.</p>"
-    elif gap_pct > 12:
-        short_html = f"<div class='sell-signal'>❌ القرار: بيع/انتظر</div><p><b>التحليل:</b> السعر في مصر سابق العالمي بفقاعة {gap_pct:.1f}%.<br><b>المخاطرة:</b> عالية جداً لو العالمي ثبت.</p>"
-    else:
-        short_html = "<div class='hold-signal'>🔄 القرار: تفرج (HOLD)</div><p>السوق متزن تماماً بين مصر وبورصة نيويورك.</p>"
-
-    long_html = f"<div class='buy-signal'>📈 المدى البعيد: صاعد</div>" if curr_global > df['EMA_20'].iloc[-1] else f"<div class='sell-signal'>📉 المدى البعيد: هابط</div>"
-    long_html += f"<p><b>المستوى القادم:</b> ${curr_global * 1.05:.0f}<br><b>مؤشر القوة (RSI):</b> {int(rsi_val)}</p>"
-
     with col_a:
-        st.markdown(f"<div class='oracle-box'><h3>📅 المدى القريب</h3>{short_html}</div>", unsafe_allow_html=True)
+        if gap_pct < -1:
+            short_msg = f"<div style='color:#39FF14; font-size:20px;'>✅ القرار: اشتري فوراً</div><p>السعر المحلي أرخص من العالمي بـ {abs(gap_pct):.1f}%.<br>مكسبك المتوقع في الجرام: <b>{fair_local_price - local_21:.0f} جنيه</b>.</p>"
+        elif gap_pct > 10:
+            short_msg = "<div style='color:#FF007F; font-size:20px;'>❌ القرار: بيع/انتظر</div><p>فيه فقاعة في مصر حالياً. السعر غالي مقارنة بالبورصة العالمية.</p>"
+        else:
+            short_msg = "<div style='color:#FFD700; font-size:20px;'>🔄 القرار: تفرج (HOLD)</div><p>السوق متزن جداً حالياً، مفيش فرص ربح سريعة.</p>"
+        st.markdown(f"<div class='oracle-box'><h3>📅 المدى القريب</h3>{short_msg}</div>", unsafe_allow_html=True)
+
     with col_b:
-        st.markdown(f"<div class='oracle-box'><h3>⏳ المدى البعيد</h3>{long_html}</div>", unsafe_allow_html=True)
+        trend_long = "صاعد 📈" if curr_global > df['EMA_20'].iloc[-1] else "هابط 📉"
+        long_msg = f"<div style='color:#00E5FF; font-size:20px;'>الاتجاه العام: {trend_long}</div>"
+        long_msg += f"<p>مؤشر القوة: {rsi_html}<br>لو الـ RSI كسر الـ 70، ابدأ جني أرباحك فوراً ولا تشتري جديد.</p>"
+        st.markdown(f"<div class='oracle-box'><h3>⏳ المدى البعيد</h3>{long_msg}</div>", unsafe_allow_html=True)
 
     # 7. الشارت
     fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
@@ -100,4 +118,4 @@ try:
     st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Nexus Sync Error: {e}")
+    st.info("Nexus is calibrating sensors...")
